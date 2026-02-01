@@ -1,0 +1,460 @@
+{
+  "purpose": "Define data cleaning and table handling rules for processing scanned technical PDFs using Unstructured before RAG embedding.",
+  "principles": [
+    "Embed meaning, not representation",
+    "Do not embed raw tables or images",
+    "Store tables and images separately and reference them",
+    "Unstructured output is raw and requires downstream refinement"
+  ],
+  "element_categories": {
+    "embed_worthy_text": [
+      "Title",
+      "NarrativeText",
+      "ListItem"
+    ],
+    "tables": [
+      "Table",
+      "UncategorizedText_near_table"
+    ],
+    "images": [
+      "Image",
+      "Figure",
+      "FigureCaption"
+    ],
+    "noise": [
+      "Single characters",
+      "Symbols",
+      "OCR artifacts",
+      "Decorative or layout text"
+    ]
+  },
+  "text_quality_rules": {
+    "min_length": 20,
+    "min_alpha_ratio": 0.5,
+    "drop_if_too_short": true,
+    "drop_if_symbol_heavy": true
+  },
+  "table_handling": {
+    "concept": "Tables are regions, not single elements",
+    "spillover_rules": {
+      "requires_table_on_page": true,
+      "must_appear_after_table": true,
+      "allowed_element_type": "UncategorizedText",
+      "requires_text_quality_pass": true
+    }
+  },
+  "spatial_boundary": {
+    "type": "adaptive",
+    "calculation": {
+      "base_metric": "average_table_row_gap",
+      "tolerance_percentage": {
+        "min": 10,
+        "max": 15
+      }
+    },
+    "decision_rule": "text_top <= table_bottom + spillover_limit"
+  },
+  "embedding_strategy": {
+    "include": [
+      "Clean narrative text",
+      "Controlled section headers",
+      "Summarized table context",
+      "Summarized image context"
+    ],
+    "exclude": [
+      "Raw table rows",
+      "OCR noise",
+      "Base64 images",
+      "ASCII table dumps"
+    ]
+  },
+  "context_generation": {
+    "tables": "Generate a short semantic summary describing table content",
+    "images": "Generate a short descriptive sentence explaining the image or figure"
+  },
+  "storage_model": {
+    "per_page": {
+      "clean_text": "string",
+      "tables": "structured_data_or_html",
+      "images": "file_path_or_base64",
+      "metadata": [
+        "page_number",
+        "section_title",
+        "document_id"
+      ]
+    }
+  },
+  "rag_runtime_flow": [
+    "Retrieve relevant text embeddings",
+    "Identify referenced pages",
+    "Attach related tables and images",
+    "Render answer with citations and visuals"
+  ],
+  "non_goals": [
+    "Perfect OCR table reconstruction",
+    "Embedding numeric tables directly",
+    "Grammar-based NLP parsing"
+  ]
+}
+
+
+
+
+yaml file
+
+
+purpose: >
+  Define data cleaning and table handling rules for processing scanned
+  technical PDFs using Unstructured before RAG embedding.
+
+principles:
+  - Embed meaning, not representation
+  - Do not embed raw tables or images
+  - Store tables and images separately and reference them
+  - Unstructured output is raw and requires downstream refinement
+
+element_categories:
+  embed_worthy_text:
+    - Title
+    - NarrativeText
+    - ListItem
+
+  tables:
+    - Table
+    - UncategorizedText_near_table
+
+  images:
+    - Image
+    - Figure
+    - FigureCaption
+
+  noise:
+    - Single characters
+    - Symbols
+    - OCR artifacts
+    - Decorative or layout text
+
+text_quality_rules:
+  min_length: 20
+  min_alpha_ratio: 0.5
+  drop_if_too_short: true
+  drop_if_symbol_heavy: true
+
+table_handling:
+  concept: Tables are regions, not single elements
+  spillover_rules:
+    requires_table_on_page: true
+    must_appear_after_table: true
+    allowed_element_type: UncategorizedText
+    requires_text_quality_pass: true
+
+spatial_boundary:
+  type: adaptive
+  calculation:
+    base_metric: average_table_row_gap
+    tolerance_percentage:
+      min: 10
+      max: 15
+  decision_rule: text_top <= table_bottom + spillover_limit
+
+embedding_strategy:
+  include:
+    - Clean narrative text
+    - Controlled section headers
+    - Summarized table context
+    - Summarized image context
+  exclude:
+    - Raw table rows
+    - OCR noise
+    - Base64 images
+    - ASCII table dumps
+
+context_generation:
+  tables: Generate a short semantic summary describing table content
+  images: Generate a short descriptive sentence explaining the image or figure
+
+storage_model:
+  per_page:
+    clean_text: string
+    tables: structured_data_or_html
+    images: file_path_or_base64
+    metadata:
+      - page_number
+      - section_title
+      - document_id
+
+rag_runtime_flow:
+  - Retrieve relevant text embeddings
+  - Identify referenced pages
+  - Attach related tables and images
+  - Render answer with citations and visuals
+
+non_goals:
+  - Perfect OCR table reconstruction
+  - Embedding numeric tables directly
+  - Grammar-based NLP parsing
+
+
+
+
+TEXT
+
+
+📄 RAG Data Cleaning & Table Handling Specification
+1. Purpose
+
+This document defines the data cleaning, table handling, and contextual extraction rules for processing scanned technical PDFs using Unstructured before building a RAG (Retrieval-Augmented Generation) system.
+
+The goal is to:
+
+Preserve semantic meaning
+
+Avoid OCR noise
+
+Handle tables and images correctly
+
+Produce high-quality embeddings
+
+2. High-Level Principles
+
+Embed meaning, not representation
+
+Do NOT embed raw tables, images, or OCR garbage
+
+Embed clean, human-readable semantic text only
+
+Tables and images are contextual, not textual
+
+Store tables and images separately
+
+Include their context in text embeddings via summaries
+
+Unstructured output is raw by design
+
+Cleaning and refinement are required downstream
+
+3. Element Categories
+
+Unstructured elements are classified into the following groups:
+
+3.1 Embed-Worthy Text (Primary)
+
+These are candidates for embeddings after cleaning:
+
+Title
+
+NarrativeText
+
+ListItem
+
+3.2 Tables (Secondary – stored separately)
+
+Table
+
+Table-related OCR spillover (UncategorizedText near tables)
+
+3.3 Images (Secondary – stored separately)
+
+Image
+
+Figure
+
+FigureCaption
+
+3.4 Noise (Dropped)
+
+Single characters
+
+Symbols
+
+OCR artifacts
+
+Decorative or layout text
+
+Most UncategorizedText not linked to tables
+
+4. Text Quality Rules (Global)
+
+A text block is considered valid only if:
+
+Minimum length threshold is met
+
+Alphabetic character ratio is sufficiently high
+
+Text is human-readable
+
+Not composed mainly of symbols or broken OCR
+
+Very short strings (1–5 characters) are always dropped.
+
+5. Table Handling Strategy (Core Logic)
+5.1 Tables Are Regions, Not Single Elements
+
+A table may be represented as:
+
+One Table element
+
+PLUS multiple UncategorizedText elements that belong to the same visual region
+
+Therefore, table handling is region-based, not element-type-based.
+
+5.2 Table Spillover Detection Rules
+
+An UncategorizedText element is considered table spillover if ALL conditions below are met:
+
+Structural Trigger
+
+A Table element exists on the same page
+
+Order Rule
+
+The text appears immediately after the table in reading order
+
+Type Rule
+
+Element type must be UncategorizedText
+
+Spatial Rule (Adaptive Boundary)
+
+Text is within a dynamically calculated vertical boundary below the table
+
+Text Quality Rule
+
+Passes minimum length and alphabetic density checks
+
+If any condition fails → the text is NOT treated as table spillover.
+
+6. Spatial Boundary Definition (Adaptive)
+6.1 Why Adaptive Boundaries
+
+Fixed pixel or line thresholds fail due to:
+
+Different DPI
+
+OCR jitter
+
+Variable row heights
+
+Instead, boundaries are derived from the table itself.
+
+6.2 Boundary Calculation
+
+Measure vertical gaps between detected table rows
+
+Compute the average row gap
+
+Define a spillover boundary as:
+
+spillover_limit = average_row_gap × (1 + tolerance)
+
+
+Where:
+
+tolerance = 10% to 15%
+
+6.3 Spillover Decision
+
+A text block belongs to the table if:
+
+text_top <= table_bottom + spillover_limit
+
+
+This allows:
+
+Small OCR gaps
+
+Minor layout drift
+
+But prevents:
+
+Section headers
+
+Narrative paragraphs
+
+Unrelated content
+
+7. Embedding Strategy
+7.1 What Goes Into Embeddings
+
+Clean narrative text
+
+Section titles (controlled)
+
+Summarized descriptions of tables
+
+Summarized descriptions of images
+
+7.2 What Does NOT Go Into Embeddings
+
+Raw table rows
+
+OCR fragments
+
+Base64 images
+
+ASCII table dumps
+
+Decorative headers repeated per page
+
+8. Table & Image Context in Embeddings
+
+Instead of embedding raw structures:
+
+Tables → summarized text
+
+Example:
+
+“Table listing engine systems including control and safety systems, lubrication, fuel oil, and cooling water systems.”
+
+Images → descriptive text
+
+Example:
+
+“Figure showing cross-sectional view of a diesel engine with piston, crankshaft, and camshaft.”
+
+The raw table/image is stored separately and referenced by:
+
+Page number
+
+Section title
+
+Document ID
+
+9. Storage Model
+
+For each page:
+
+clean_text → used for embeddings
+
+tables → stored as HTML / structured data
+
+images → stored as files or base64
+
+metadata → page number, section, document ID
+
+10. Answer-Time Assembly (RAG)
+
+At runtime:
+
+Retrieve relevant text embeddings
+
+Identify referenced pages
+
+Attach relevant tables and images
+
+Render answer with citations and visuals
+
+11. Explicit Non-Goals
+
+Perfect table reconstruction from OCR
+
+Embedding numeric tables directly
+
+Grammar-based NLP parsing (verbs, POS tagging)
+
+12. Design Summary (One Paragraph)
+
+This pipeline prioritizes semantic clarity over raw recall.
+Tables and images are treated as structured references, while embeddings contain only clean, meaningful text and summaries.
+Spatial proximity with adaptive tolerance ensures robust table detection without polluting embeddings.
+The system is optimized for technical manuals, scanned PDFs, and RAG accuracy.

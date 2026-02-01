@@ -1,0 +1,40 @@
+load pages from document
+|
+|
+|
+split those pages (use different splitter)
+|
+|
+|
+form embedding 
+|
+|
+|
+store in vectorstore
+|
+|
+|
+
+-------------------
+
+user query 
+|
+|
+|
+embedd it 
+|
+|
+|
+retrive context pages ( use different types of ritriver )
+|
+|
+|
+pass context and query to llm to get output (prompt generation)
+|
+|
+|
+compress using llms
+
+
+
+[fix prblem url path on bill upload and view page ]

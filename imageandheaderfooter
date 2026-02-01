@@ -1,0 +1,241 @@
+IMAGE FILTERING & HEADER/FOOTER ELIMINATION SPEC
+
+(Save as: image_and_header_footer_elimination.md)
+
+1. Purpose
+
+This document defines rules for:
+
+Filtering useless images (e.g. black dots, scan artifacts)
+
+Detecting and removing repeating headers and footers in scanned PDFs
+
+The goal is to prevent embedding pollution and improve RAG retrieval quality.
+
+2. Image Filtering Specification
+2.1 Problem Statement
+
+Scanned PDFs often contain:
+
+black dots
+
+bullet artifacts
+
+decorative marks
+
+scanning noise
+
+These images have no semantic value and must be removed.
+
+2.2 Image Acceptance Rules
+
+An image is kept only if it passes ALL checks below.
+
+Rule A — Minimum Size Check
+
+Image width ≥ 50 px
+
+Image height ≥ 50 px
+
+Images smaller than this are discarded.
+
+Rule B — Pixel Density (Uniformity) Check
+
+Definition
+An image is considered uniform if most pixels are nearly the same color.
+
+Procedure
+
+Convert image to grayscale
+
+Count pixels in:
+
+Near-black range: [0–15]
+
+Near-white range: [240–255]
+
+Compute ratio of uniform pixels
+
+Threshold
+
+If ≥ 90% of pixels are near-black OR near-white → discard image
+
+Rule C — Optional Entropy Check (Future-safe)
+
+Compute Shannon entropy on grayscale image
+
+If entropy < 2.5 → discard image
+
+(Optional, not mandatory for initial version)
+
+2.3 Final Image Rule (Locked)
+
+Keep images only if they are sufficiently large and visually non-uniform.
+Discard images that are small, uniform, or scan artifacts.
+
+3. Header & Footer Elimination Specification
+3.1 Problem Statement
+
+Headers and footers:
+
+repeat across pages
+
+dominate embeddings
+
+introduce false similarity
+
+pollute semantic retrieval
+
+They must be removed before chunking and embedding.
+
+3.2 Candidate Detection
+
+A text block is considered a header/footer candidate if:
+
+Located in top 15% or bottom 15% of page height
+
+Text length ≥ 10 characters
+
+Appears on more than one page
+
+3.3 Text Normalization (Critical)
+
+Before comparison, normalize text by:
+
+converting to lowercase
+
+trimming whitespace
+
+collapsing multiple spaces
+
+removing punctuation
+
+removing digits
+
+This ensures OCR variations are handled correctly.
+
+3.4 Frequency-Based Detection
+
+Count how many pages each normalized text appears on.
+
+Threshold
+
+If a text appears on ≥ 30–40% of pages, classify as header/footer
+
+This accounts for:
+
+OCR noise
+
+missing pages
+
+small layout shifts
+
+3.5 Removal Rule
+
+Once identified:
+
+Remove the header/footer globally
+
+Do NOT restrict removal only to top/bottom positions
+
+Remove all matching occurrences across pages
+
+3.6 Always-Remove Rules
+
+Remove automatically if:
+
+Text is numeric-only (page numbers)
+
+Text length < 10 characters
+
+Text matches known noise patterns
+
+3.7 What Should NOT Be Removed
+
+Do NOT remove:
+
+Section titles that vary by page
+
+Table titles
+
+Figure captions
+
+Text appearing on only a few pages
+
+
+
+3.8 Pipeline Order (Mandatory)
+
+Partition PDF
+→ Detect header/footer candidates
+→ Identify repeating texts
+→ Remove headers/footers
+→ Image filtering
+→ Table spillover logic
+→ Hybrid chunking
+→ Embedding
+3.9 Final Header/Footer Rule (Locked)
+
+Any text repeating across a significant fraction of pages at consistent top or bottom positions is classified as header/footer and removed globally.
+
+4. Design Guarantees
+
+✔ OCR-safe
+✔ Layout-agnostic
+✔ No hardcoded strings
+✔ Deterministic
+✔ Easy to tune
+✔ Does not affect tables or images
+
+5. Summary (One Paragraph)
+
+This specification ensures that repeated headers, footers, and non-informative images are removed early in the pipeline to prevent embedding pollution. Image filtering relies on size and pixel-density heuristics, while header/footer detection uses normalized text frequency across pages. Both approaches are deterministic, OCR-robust, and suitable for large scanned technical manuals.
+
+(image_and_header_footer_elimination.json)
+
+(Save as: image_and_header_footer_elimination.json)
+
+{
+  "image_filtering": {
+    "min_width_px": 50,
+    "min_height_px": 50,
+    "pixel_uniformity": {
+      "near_black_range": [0, 15],
+      "near_white_range": [240, 255],
+      "max_uniform_ratio": 0.9
+    },
+    "entropy_check": {
+      "enabled": false,
+      "min_entropy": 2.5
+    }
+  },
+  "header_footer_detection": {
+    "position_threshold": {
+      "top_percent": 15,
+      "bottom_percent": 15
+    },
+    "min_text_length": 10,
+    "repetition_threshold_percent": 30,
+    "text_normalization": [
+      "lowercase",
+      "trim_whitespace",
+      "collapse_spaces",
+      "remove_punctuation",
+      "remove_digits"
+    ],
+    "always_remove": [
+      "numeric_only_text",
+      "short_noise_strings"
+    ],
+    "global_removal": true
+  },
+  "pipeline_order": [
+    "partition_pdf",
+    "detect_header_footer_candidates",
+    "remove_headers_footers",
+    "filter_images",
+    "table_spillover_processing",
+    "hybrid_chunking",
+    "embedding"
+  ]
+}
